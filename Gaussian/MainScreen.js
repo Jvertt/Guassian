@@ -3,50 +3,52 @@ import { StyleSheet, View, Text, TextInput, TouchableOpacity, ImageBackground } 
 
 class MainScreen extends Component {
   render() {
-    return (
-      <ImageBackground source={require('./background.jpeg')} style={styles.backgroundImage}>
-        <View style={styles.container}>
-          <Text style={styles.label}>GAUSSIAN</Text>
-          <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('SignUp')}>
-            <Text style={styles.buttonText}>Sign Up</Text>
-          </TouchableOpacity>
-        </View>
-      </ImageBackground>
-    );
-  }
+    const { navigation } = this.props;
 
-  signUp = () => {
-    this.props.navigation.navigate('Signup');
+    return (
+      <View style={styles.container}>
+        <ImageBackground source={require('./back4.gif')} style={styles.backgroundImage} resizeMode="cover">
+          <View style={styles.overlay}>
+            <Text style={styles.label}>GAUSSIAN</Text>
+            <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('SignUp')}>
+              <Text style={styles.buttonText}>Sign Up</Text>
+            </TouchableOpacity>
+          </View>
+        </ImageBackground>
+      </View>
+    );
   }
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   backgroundImage: {
     flex: 1,
-    resizeMode: 'cover', // or 'stretch'
   },
-  container: {
+  overlay: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 90,
-    backgroundColor: 'rgba(12, 27, 58, 0.6)', // add a semi-transparent layer over the background image
+    padding: '10%',
+    backgroundColor: 'rgba(12, 27, 58, 0.4)', // add a semi-transparent layer over the background image
   },
   label: {
     color: '#ffffff',
-    fontSize: 90,
+    fontSize: '55vw',
     fontFamily: 'Montserrat-limited/Montserrat-ExtraBold',
     fontWeight: 'bold',
-    marginBottom: 20,
+    marginBottom: '80%',
   },
   button: {
-    margin: '200px',
-    width: '40%',
-   height: '40px',
+    marginVertical: '10%',
+    width: '50%',
+    height: '8%',
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 10,
-    backgroundColor: '#FF904D',
+    borderRadius: '6vw',
+    backgroundColor: 'rgba(211,211,211,0.6)',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -59,10 +61,14 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: '#ffffff',
-    fontSize: 30,
+    fontSize: '18vw',
     fontFamily: 'Montserrat-limited/Montserrat-ExtraBold',
     fontWeight: 'bold',
   },
 });
+
+MainScreen.navigationOptions = {
+  headerShown: false,
+};
 
 export default MainScreen;

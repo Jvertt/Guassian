@@ -1,18 +1,19 @@
-import asyncio
-import json
-import httpx
-import aiohttp
+from flask import Flask, jsonify
+from flask_cors import CORS
 from bs4 import BeautifulSoup
 from typing import List, Dict
 from newspaper import Article, ArticleException
-import nltk
-import ssl
 from nltk.corpus import stopwords
 from nltk.tokenize import sent_tokenize
 from transformers import T5ForConditionalGeneration, T5Tokenizer
+import nltk
+import ssl
+import aiohttp
+import asyncio
+import json
 
-nltk.download('punkt')
-nltk.download('stopwords')
+app = Flask(__name__)
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 ORGANIZATIONS = [
     # Stocks
@@ -35,6 +36,11 @@ ORGANIZATIONS = [
     ["News", "ProPublica", "https://www.propublica.org/"],
 ]
 
+CONFIG_MAX_URLS = 15
+CONFIG_DOWNLOAD_TIMEOUT = 30
+CONFIG_SCRAPE_TIMEOUT = 20
+
+
 async def download_and_parse_article(session, link_url):
     try:
         async with session.get(link_url) as response:
@@ -50,6 +56,37 @@ async def download_and_parse_article(session, link_url):
         print(f"Error downloading {link_url}: {e}")
         return None
 
+
+def filter_urls(urls: List[str]) -> List[str]:
+    blacklisted_words = ['advertising', 'donate', 'join', 'checkout', 'events', 'webinar', 'login', 'signup',
+                         'subscribe', 'terms', 'privacy']
+    filtered_urls = []
+    for url in urls:
+        if not any(blacklisted_word in url for blacklisted_word in blacklisted_words):
+            filtered_urls.append(url)
+    return filtered_urls
+
+
+def tokenize_sentences(text: str) -> List[str]:
+    sentences = sent_tokenize(text)
+    return sentences
+
+
+def summarize_text(text: str, tokenizer, model) -> str:
+    inputs = tokenizer.encode("summarize: " + text, return_tensors='pt', max_length=1024, truncation=True)
+    outputs = model.generate(inputs, max_length=300, min_length=80, length_penalty=1.5, num_beams=4,
+                             early_stopping=True)
+    summary = tokenizer.decode(outputs[0])
+    return summary
+
+
+def remove_stopwords(text: str) -> str:
+    stop_words = set(stopwords.words('english'))
+    words = text.split()
+    filtered_text = " ".join([word for word in words if word.lower() not in stop_words])
+    return filtered_text
+
+
 async def scrape_urls(interest: str, base_url: str, max_urls_per_company: int, download_timeout: int) -> List[dict]:
     scraped_data = []
     urls_scraped_count = 0
@@ -61,14 +98,16 @@ async def scrape_urls(interest: str, base_url: str, max_urls_per_company: int, d
 
         connector = aiohttp.TCPConnector(ssl=ssl_context)
 
-        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=download_timeout), connector=connector) as session:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=download_timeout),
+                                         connector=connector) as session:
             async with session.get(base_url) as response:
                 html = await response.text()
                 soup = BeautifulSoup(html, 'html.parser')
                 links = soup.find_all('a')
 
-                unfiltered_links = [link.get('href') for link in links if link.get('href') and link.get('href').startswith('http')]
-                filtered_links = filter_scraped_urls(unfiltered_links)
+                unfiltered_links = [link.get('href') for link in links if link.get('href') and link.get(
+                    'href').startswith('http')]
+                filtered_links = filter_urls(unfiltered_links)
 
                 tasks = []
 
@@ -94,40 +133,12 @@ async def scrape_urls(interest: str, base_url: str, max_urls_per_company: int, d
 
     return scraped_data
 
-def filter_scraped_urls(urls: List[str]) -> List[str]:
-    blacklist = ['advertising', 'donate', 'join', 'checkout', 'events', 'webinar', 'login', 'signup', 'subscribe', 'terms', 'privacy']
 
-    filtered_urls = []
-    for url in urls:
-        if not any(blacklisted_word in url for blacklisted_word in blacklist):
-            filtered_urls.append(url)
-
-    return filtered_urls
-
-def tokenize_sentences(text: str) -> List[str]:
-    sentences = sent_tokenize(text)
-    return sentences
-
-def summarize_text(text: str, tokenizer, model) -> str:
-    inputs = tokenizer.encode("summarize: " + text, return_tensors='pt', max_length=1024, truncation=True)
-    outputs = model.generate(inputs, max_length=300, min_length=80, length_penalty=1.5, num_beams=4, early_stopping=True)
-    summary = tokenizer.decode(outputs[0])
-
-    return summary
-
-def remove_stopwords(text: str) -> str:
-    stop_words = set(stopwords.words('english'))
-    words = text.split()
-    filtered_text = " ".join([word for word in words if word.lower() not in stop_words])
-    return filtered_text
-
-async def scrape_and_process(organizations: List[List[str]], interest: str, max_urls: int, download_timeout: int, scrape_timeout: int) -> Dict[str, str]:
+async def scrape_and_process(organizations: List[List[str]], interest: str, max_urls: int, download_timeout: int,
+                             scrape_timeout: int, tokenizer, model) -> Dict[str, str]:
     print("Entering scrape_and_process...")
     scraped_urls = {}
     category_contents = {}
-
-    tokenizer = T5Tokenizer.from_pretrained('t5-base')
-    model = T5ForConditionalGeneration.from_pretrained('t5-base')
 
     tasks = []
     for category, _, base_url in organizations:
@@ -156,10 +167,22 @@ async def scrape_and_process(organizations: List[List[str]], interest: str, max_
     return category_summaries
 
 
-if __name__ == "__main__":
+@app.route("/")
+def get_scraped_data():
     with open("user_profile_data.json") as f:
         user_profile_data = json.load(f)
         # Get the interest from the user profile data
         interest = user_profile_data["interest"]
     print(f"Interest: {interest}")
-    scraped_data = asyncio.run(scrape_and_process(ORGANIZATIONS, interest, 15, 30, 20))
+
+    tokenizer = T5Tokenizer.from_pretrained('t5-base')
+    model = T5ForConditionalGeneration.from_pretrained('t5-base')
+
+    scraped_data = asyncio.run(
+        scrape_and_process(ORGANIZATIONS, interest, CONFIG_MAX_URLS, CONFIG_DOWNLOAD_TIMEOUT, CONFIG_SCRAPE_TIMEOUT,
+                           tokenizer, model))
+    return jsonify(scraped_data)
+
+
+if __name__ == "__main__":
+    app.run()

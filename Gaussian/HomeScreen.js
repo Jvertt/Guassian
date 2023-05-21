@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, ImageBackground, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, Text, ImageBackground, TouchableOpacity, ScrollView } from 'react-native';
 
 const HomeScreen = () => {
   const [data, setData] = useState("");
@@ -22,14 +22,13 @@ const HomeScreen = () => {
   };
 
   const handleButtonClick = () => {
-  fetch("http://127.0.0.1:5000")
-    .then(response => response.text())  // Expecting text response
-    .then(data => {
-      setWidget3Summary(data);  // Update the state with the received message
-    })
-    .catch(error => console.log(error));
-};
-
+    fetch("http://127.0.0.1:5000")
+      .then(response => response.text())  // Expecting text response
+      .then(data => {
+        setWidget3Summary(data);  // Update the state with the received message
+      })
+      .catch(error => console.log(error));
+  };
 
   return (
     <ImageBackground source={require('./gray.png')} style={styles.backgroundImage}>
@@ -42,7 +41,9 @@ const HomeScreen = () => {
           <Text style={styles.text}></Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.widget3, expandedWidgets[2] && styles.widgetExpanded]} onPress={() => handleWidgetClick(2)}>
-          <Text style={styles.text}>{widget3Summary}</Text>
+          <ScrollView contentContainerStyle={styles.textContainer} showsVerticalScrollIndicator={false}>
+            <Text style={styles.text}>{widget3Summary}</Text>
+          </ScrollView>
         </TouchableOpacity>
       </View>
       <TouchableOpacity style={styles.button} onPress={handleButtonClick}>
@@ -70,7 +71,7 @@ const styles = StyleSheet.create({
   },
   widget: {
     width: '100%',
-    height: '15%',
+    height: 100, // Fixed height
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 40,
@@ -92,7 +93,7 @@ const styles = StyleSheet.create({
   },
   widget2: {
     width: '110%',
-    height: '32%',
+    height: 150, // Fixed height
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 40,
@@ -114,7 +115,7 @@ const styles = StyleSheet.create({
   },
   widget3: {
     width: '110%',
-    height: '45%',
+    height: 200, // Fixed height
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 40,
@@ -134,20 +135,13 @@ const styles = StyleSheet.create({
     borderStyle: 'solid',
     marginBottom: 20,
   },
-  widgetExpanded: {
-    height: '60%',
-  },
+  widgetExpanded: {},
+  textContainer: {},
   text: {
     fontSize: 24,
     textAlign: 'center',
     padding: 20,
     color: 'white',
-    textShadowColor: 'rgba(0, 0, 0, 0.9)',
-    textShadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    textShadowRadius: 3,
   },
   button: {
     width: '80%',
